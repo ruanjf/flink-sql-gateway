@@ -159,7 +159,7 @@ public class InsertOperation extends AbstractJobOperation {
 
 		// blocking deployment
 		try {
-			JobClient jobClient = deployer.deploy().get();
+			JobClient jobClient = deployer.deploy(executionContext.getClassLoader()).get();
 			JobID jobID = jobClient.getJobID();
 			this.clusterDescriptorAdapter =
 					ClusterDescriptorAdapterFactory.create(context.getExecutionContext(), configuration, sessionId, jobID);

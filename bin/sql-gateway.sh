@@ -107,6 +107,7 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 JVM_ARGS=`extractExecutionResults "$jvm_args_output" 1`
+JVM_ARGS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005 $JVM_ARGS"
 
 
 if [ -n "$FLINK_SQL_GATEWAY_JAR" ]; then

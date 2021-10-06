@@ -64,6 +64,10 @@ public class ExecutionEntry extends ConfigEntry {
 
 	public static final String EXECUTION_TYPE_VALUE_BATCH = "batch";
 
+	public static final String EXECUTION_TARGET = "target";
+
+	public static final String EXECUTION_TARGET_VALUE_REMOTE = "remote";
+
 	private static final String EXECUTION_TIME_CHARACTERISTIC = "time-characteristic";
 
 	private static final String EXECUTION_TIME_CHARACTERISTIC_VALUE_EVENT_TIME = "event-time";
@@ -187,6 +191,12 @@ public class ExecutionEntry extends ConfigEntry {
 		return properties.getOptionalString(EXECUTION_TYPE)
 			.map((v) -> v.equals(EXECUTION_TYPE_VALUE_BATCH))
 			.orElse(false);
+	}
+
+	public boolean inTargetRemoteMode() {
+		return properties.getOptionalString(EXECUTION_TARGET)
+				.map((v) -> v.equals(EXECUTION_TARGET_VALUE_REMOTE))
+				.orElse(false);
 	}
 
 	public boolean isStreamingPlanner() {

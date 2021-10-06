@@ -211,8 +211,9 @@ public class SelectOperation extends AbstractJobOperation {
 		try {
 			// writing to a sink requires an optimization step that might reference UDFs during code compilation
 			executionContext.wrapClassLoader(() -> {
-				executionContext.getTableEnvironment().registerTableSink(tableName, result.getTableSink());
-				table.insertInto(tableName);
+//				executionContext.getTableEnvironment().registerTableSink(tableName, result.getTableSink());
+//				table.insertInto(tableName);
+				table.executeInsert(tableName);
 				return null;
 			});
 			pipeline = executionContext.createPipeline(jobName);
@@ -244,7 +245,7 @@ public class SelectOperation extends AbstractJobOperation {
 		JobClient jobClient;
 		// blocking deployment
 		try {
-			jobClient = deployer.deploy().get();
+			jobClient = deployer.deploy(executionContext.getClassLoader()).get();
 		} catch (Exception e) {
 			LOG.error(String.format("Session: %s. Error running SQL job.", sessionId), e);
 			throw new RuntimeException("Error running SQL job.", e);

@@ -58,7 +58,7 @@ public class ProgramDeployer {
 		this.jobName = jobName;
 	}
 
-	public CompletableFuture<JobClient> deploy() {
+	public CompletableFuture<JobClient> deploy(ClassLoader userCodeClassloader) {
 		LOG.info("Submitting job {} for query {}`", pipeline, jobName);
 		if (LOG.isDebugEnabled()) {
 			LOG.debug("Submitting job {} with configuration: \n{}", pipeline, configuration);
@@ -78,7 +78,7 @@ public class ProgramDeployer {
 
 		final PipelineExecutor executor = executorFactory.getExecutor(configuration);
 		try {
-			return executor.execute(pipeline, configuration);
+			return executor.execute(pipeline, configuration, userCodeClassloader);
 		} catch (Exception e) {
 			throw new RuntimeException("Could not execute program.", e);
 		}

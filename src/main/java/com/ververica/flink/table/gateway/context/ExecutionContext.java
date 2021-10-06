@@ -24,6 +24,7 @@ import com.ververica.flink.table.gateway.config.entries.ExecutionEntry;
 import com.ververica.flink.table.gateway.config.entries.SinkTableEntry;
 import com.ververica.flink.table.gateway.config.entries.SourceSinkTableEntry;
 import com.ververica.flink.table.gateway.config.entries.SourceTableEntry;
+import com.ververica.flink.table.gateway.config.entries.TableEntry;
 import com.ververica.flink.table.gateway.config.entries.TemporalTableEntry;
 import com.ververica.flink.table.gateway.config.entries.ViewEntry;
 import com.ververica.flink.table.gateway.utils.SqlExecutionException;
@@ -90,6 +91,7 @@ import javax.annotation.Nullable;
 
 import java.lang.reflect.Method;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -281,7 +283,7 @@ public class ExecutionContext<ClusterID> {
 			availableCommandLines,
 			activeCommandLine);
 
-		Configuration executionConfig = activeCommandLine.applyCommandLineOptionsToConfiguration(
+		Configuration executionConfig = activeCommandLine.toConfiguration(
 			commandLine);
 
 		try {
@@ -473,7 +475,13 @@ public class ExecutionContext<ClusterID> {
 			ModuleManager moduleManager,
 			FunctionCatalog functionCatalog) {
 		if (environment.getExecution().isStreamingPlanner()) {
-			streamExecEnv = createStreamExecutionEnvironment();
+			if (environment.getExecution().inTargetRemoteMode()) {
+				streamExecEnv = StreamExecutionEnvironment
+						.createRemoteEnvironment(environment.getDeployment().getGatewayAddress(),
+								environment.getDeployment().getGatewayPort());
+			} else {
+				streamExecEnv = createStreamExecutionEnvironment();
+			}
 			execEnv = null;
 
 			final Map<String, String> executorProperties = settings.toExecutorProperties();
@@ -488,7 +496,13 @@ public class ExecutionContext<ClusterID> {
 				functionCatalog);
 		} else if (environment.getExecution().isBatchPlanner()) {
 			streamExecEnv = null;
-			execEnv = createExecutionEnvironment();
+			if (environment.getExecution().inTargetRemoteMode()) {
+				execEnv = ExecutionEnvironment
+						.createRemoteEnvironment(environment.getDeployment().getGatewayAddress(),
+								environment.getDeployment().getGatewayPort());
+			} else {
+				execEnv = createExecutionEnvironment();
+			}
 			executor = null;
 			tableEnv = new BatchTableEnvironmentImpl(
 				execEnv,
@@ -525,9 +539,9 @@ public class ExecutionContext<ClusterID> {
 			}
 		});
 		// register table sources
-		tableSources.forEach(tableEnv::registerTableSource);
-		// register table sinks
-		tableSinks.forEach(tableEnv::registerTableSink);
+//		tableSources.forEach(tableEnv::registerTableSource);
+//		// register table sinks
+//		tableSinks.forEach(tableEnv::registerTableSink);
 
 		//--------------------------------------------------------------------------------------------------------------
 		// Step.4 Register temporal tables.
@@ -550,6 +564,23 @@ public class ExecutionContext<ClusterID> {
 				registerView(viewEntry);
 			}
 		});
+
+		// table, view
+		List<String> sqlList = new ArrayList<>(environment.getTables().size());
+		for (Map.Entry<String, TableEntry> me : environment.getTables().entrySet()) {
+			final String name = me.getKey();
+			final TableEntry entry = me.getValue();
+			if (entry instanceof ViewEntry) {
+				sqlList.add(String.format("CREATE TEMPORARY VIEW %s AS %s", name, ((ViewEntry) entry).getQuery()));
+			} else if (entry instanceof SourceTableEntry ||
+					entry instanceof SinkTableEntry ||
+					entry instanceof SourceSinkTableEntry) {
+
+				sqlList.add(String.format("CREATE TABLE %s (%s) WITH (%s)",
+						entry.getName(), entry.asMap().entrySet().toString(), ""));
+			}
+		}
+		sqlList.forEach(tableEnv::executeSql);
 
 		//--------------------------------------------------------------------------------------------------------------
 		// Step.6 Set current catalog and database.
