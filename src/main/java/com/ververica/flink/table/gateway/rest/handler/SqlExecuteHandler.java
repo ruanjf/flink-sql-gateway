@@ -29,10 +29,13 @@ import com.ververica.flink.table.gateway.rest.session.SessionManager;
 import com.ververica.flink.table.gateway.utils.SqlGatewayException;
 import com.ververica.flink.table.gateway.utils.TableUtil;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.runtime.rest.handler.HandlerRequest;
 import org.apache.flink.runtime.rest.handler.RestHandlerException;
 import org.apache.flink.runtime.rest.messages.MessageHeaders;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.types.Row;
@@ -94,8 +97,12 @@ public class SqlExecuteHandler
 								.stream()
 								.map(col -> ColumnInfo.create(col.getName(), col.getDataType().getLogicalType()))
 								.collect(Collectors.toList());
+						columns.add(0, ColumnInfo.create("_jobId", DataTypes.STRING().getLogicalType()));
 						List<Row> data = new ArrayList<>();
-						tr.collect().forEachRemaining(data::add);
+						tr.collect().forEachRemaining(row -> {
+							final Row jobId = Row.ofKind(row.getKind(), tr.getJobClient().map(JobClient::getJobID).map(JobID::toHexString).orElse(null));
+							data.add(Row.join(jobId, row));
+						});
 
 						final ResultKind resultKind;
 						switch (tr.getResultKind()) {
