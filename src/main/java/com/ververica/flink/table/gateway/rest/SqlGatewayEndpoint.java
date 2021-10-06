@@ -32,6 +32,8 @@ import com.ververica.flink.table.gateway.rest.handler.SessionCreateHandler;
 import com.ververica.flink.table.gateway.rest.handler.SessionCreateHeaders;
 import com.ververica.flink.table.gateway.rest.handler.SessionHeartbeatHandler;
 import com.ververica.flink.table.gateway.rest.handler.SessionHeartbeatHeaders;
+import com.ververica.flink.table.gateway.rest.handler.SqlExecuteHandler;
+import com.ververica.flink.table.gateway.rest.handler.SqlExecuteHeaders;
 import com.ververica.flink.table.gateway.rest.handler.StatementExecuteHandler;
 import com.ververica.flink.table.gateway.rest.handler.StatementExecuteHeaders;
 import com.ververica.flink.table.gateway.rest.session.SessionManager;
@@ -92,6 +94,9 @@ public class SqlGatewayEndpoint extends RestServerEndpoint {
 		final GetInfoHandler getInfoHandler = new GetInfoHandler(
 			timeout, responseHeaders, GetInfoHeaders.getInstance());
 
+		final SqlExecuteHandler sqlExecuteHandler = new SqlExecuteHandler(
+				sessionManager, timeout, responseHeaders, SqlExecuteHeaders.getInstance());
+
 		ArrayList<Tuple2<RestHandlerSpecification, ChannelInboundHandler>> handlers = new ArrayList<>(30);
 		handlers.add(Tuple2.of(SessionCreateHeaders.getInstance(), sessionCreateHandler));
 		handlers.add(Tuple2.of(SessionCloseHeaders.getInstance(), sessionCloseHandler));
@@ -101,6 +106,7 @@ public class SqlGatewayEndpoint extends RestServerEndpoint {
 		handlers.add(Tuple2.of(JobCancelHeaders.getInstance(), jobCancelHandler));
 		handlers.add(Tuple2.of(ResultFetchHeaders.getInstance(), resultFetchHandler));
 		handlers.add(Tuple2.of(GetInfoHeaders.getInstance(), getInfoHandler));
+		handlers.add(Tuple2.of(SqlExecuteHeaders.getInstance(), sqlExecuteHandler));
 
 		return handlers;
 	}
