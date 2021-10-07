@@ -45,6 +45,7 @@ import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseSt
 import javax.annotation.Nonnull;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -93,16 +94,20 @@ public class SqlExecuteHandler
 					.map(tr -> {
 						ResolvedSchema schema = tr.getResolvedSchema();
 
-						List<ColumnInfo> columns = schema.getColumns()
-								.stream()
-								.map(col -> ColumnInfo.create(col.getName(), col.getDataType().getLogicalType()))
-								.collect(Collectors.toList());
-						columns.add(0, ColumnInfo.create("_jobId", DataTypes.STRING().getLogicalType()));
+						List<ColumnInfo> columns;
 						List<Row> data = new ArrayList<>();
-						tr.collect().forEachRemaining(row -> {
-							final Row jobId = Row.ofKind(row.getKind(), tr.getJobClient().map(JobClient::getJobID).map(JobID::toHexString).orElse(null));
-							data.add(Row.join(jobId, row));
-						});
+						if (tr.getJobClient().isPresent()) {
+							// 提交任务，只返回任务Id
+							columns = Collections.singletonList(ColumnInfo.create("_jobId", DataTypes.STRING().getLogicalType()));
+							data.add(Row.of(tr.getJobClient().map(JobClient::getJobID).map(JobID::toHexString).orElse(null)));
+						} else {
+							// 直接返回结果
+							columns = schema.getColumns()
+									.stream()
+									.map(col -> ColumnInfo.create(col.getName(), col.getDataType().getLogicalType()))
+									.collect(Collectors.toList());
+							tr.collect().forEachRemaining(data::add);
+						}
 
 						final ResultKind resultKind;
 						switch (tr.getResultKind()) {
