@@ -1,0 +1,197 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-sql-gateway
+  namespace: faas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flink-sql-gateway
+  template:
+    metadata:
+      labels:
+        app: flink-sql-gateway
+    spec:
+      imagePullSecrets:
+        - name: registry-ci-internal
+      containers:
+        - name: flink-sql-gateway
+          image: ''
+          command:
+            - /opt/flink-sql-gateway/bin/sql-gateway.sh
+            - -d
+            - /config/sql-gateway.yaml
+          imagePullPolicy: Always
+          resources:
+            limits:
+            # cpu: 100m
+            # memory: 500Mi
+          ports:
+            - containerPort: 8083
+              name: http
+          volumeMounts:
+            - name: localtime
+              mountPath: /etc/localtime
+            - name: config
+              mountPath: "/config"
+              readOnly: true
+      volumes:
+        - name: localtime
+          hostPath:
+            path: /usr/share/zoneinfo/Asia/Shanghai
+        - name: config
+          configMap:
+            name: flink-sql-gateway-conf
+            items:
+              - key: "sql-gateway.yaml"
+                path: "sql-gateway.yaml"
+      restartPolicy: Always
+      hostNetwork: false
+      # 允许在单节点k8s上运行.
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Equal"
+          value: ""
+          effect: "NoSchedule"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-sql-gateway
+  namespace: faas
+spec:
+  type: LoadBalancer
+  selector:
+    app: flink-sql-gateway
+  ports:
+    - port: 8083
+      targetPort: 8083
+  sessionAffinity: None
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-sql-gateway-conf
+  namespace: faas
+data:
+  sql-gateway.yaml: |
+    #==============================================================================
+    # Gateway server properties
+    #==============================================================================
+    server:
+      # The address that the gateway binds itself.
+      bind-address: 127.0.0.1
+      # The address that should be used by clients to connect to the gateway.
+      address: 127.0.0.1
+      # The port that the client connects to.
+      port: 8083
+      # The jvm args for SQL gateway process,
+      # like -Xmx2018m -Xms1024m -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCDateStamps ...
+      jvm_args: "-Xmx2018m -Xms1024m"
+
+
+    #==============================================================================
+    # Session properties
+    #==============================================================================
+    session:
+      # Session will be closed when it's not accessed for this duration, which can be disabled by setting to zero.
+      # the minimum unit is in milliseconds.
+      idle-timeout: 1d
+      # The check interval for session idle timeout, which can be disabled by setting to zero.
+      # the minimum unit is in milliseconds.
+      check-interval: 1h
+      # Max count of active sessions, which can be disabled by setting to zero.
+      max-count: 1000000
+
+
+    # See the Table API & SQL documentation for details about supported properties.
+
+    #==============================================================================
+    # Tables
+    #==============================================================================
+
+    # Define tables here such as sources, sinks, views, or temporal tables.
+
+    tables: [] # empty list
+
+
+    #==============================================================================
+    # User-defined functions
+    #==============================================================================
+
+    # Define scalar, aggregate, or table functions here.
+
+    functions: [] # empty list
+
+
+    #==============================================================================
+    # Catalogs
+    #==============================================================================
+
+    # Define catalogs here.
+
+    catalogs: [] # empty list
+    # A typical catalog definition looks like:
+    #  - name: myhive
+    #    type: hive
+    #    hive-conf-dir: /opt/hive_conf/
+    #    default-database: ...
+
+    #==============================================================================
+    # Modules
+    #==============================================================================
+
+    # Define modules here.
+
+    #modules: # note the following modules will be of the order they are specified
+    #  - name: core
+    #    type: core
+
+    #==============================================================================
+    # Execution properties
+    #==============================================================================
+
+    # Properties that change the fundamental execution behavior of a table program.
+
+    execution:
+      # parallelism of the program
+      parallelism: 1
+      # maximum parallelism
+      max-parallelism: 128
+      # current catalog ('default_catalog' by default)
+      current-catalog: default_catalog
+      # current database of the current catalog (default database of the catalog by default)
+      current-database: default_database
+
+    #==============================================================================
+    # Configuration options
+    #==============================================================================
+
+    # Configuration options for adjusting and tuning table programs.
+
+    # A full list of options and their default values can be found
+    # on the dedicated "Configuration" web page.
+
+    # A configuration can look like:
+    # configuration:
+    #   table.exec.spill-compression.enabled: true
+    #   table.exec.spill-compression.block-size: 128kb
+    #   table.optimizer.join-reorder-enabled: true
+
+    #==============================================================================
+    # Deployment properties
+    #==============================================================================
+
+    # Properties that describe the cluster to which table programs are submitted to.
+
+    deployment:
+      # general cluster communication timeout in ms
+      response-timeout: 5000
+      # (optional) address from cluster to gateway
+      gateway-address: "flink-rest"
+      # (optional) port from cluster to gateway
+      gateway-port: 9091
+
