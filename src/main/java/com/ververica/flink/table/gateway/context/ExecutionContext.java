@@ -627,12 +627,8 @@ public class ExecutionContext<ClusterID> {
 		if (tableEnv instanceof StreamTableEnvironment) {
 			StreamTableEnvironment streamTableEnvironment = (StreamTableEnvironment) tableEnv;
 			functions.forEach((k, v) -> {
-				if (v instanceof ScalarFunction) {
-					streamTableEnvironment.registerFunction(k, (ScalarFunction) v);
-				} else if (v instanceof AggregateFunction) {
-					streamTableEnvironment.registerFunction(k, (AggregateFunction<?, ?>) v);
-				} else if (v instanceof TableFunction) {
-					streamTableEnvironment.registerFunction(k, (TableFunction<?>) v);
+				if (v instanceof UserDefinedFunction) {
+					streamTableEnvironment.createTemporarySystemFunction(k, (UserDefinedFunction) v);
 				} else {
 					throw new SqlExecutionException("Unsupported function type: " + v.getClass().getName());
 				}
