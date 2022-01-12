@@ -4,7 +4,11 @@ import org.apache.flink.table.api.StatementSet;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -14,6 +18,7 @@ import java.util.stream.Collectors;
  * Table API 工具类.
  */
 public class TableUtil {
+	private static final Logger LOG = LoggerFactory.getLogger(TableUtil.class);
 
 	private static final Pattern STATEMENT_SET_START = Pattern.compile("[\\s\\S]*?\\n*?BEGIN\\s+STATEMENT\\s+SET\\s*$");
 	private static final Pattern STATEMENT_SET_END = Pattern.compile("[\\s\\S]*?\\n+END\\s*$");
@@ -43,6 +48,7 @@ public class TableUtil {
 
 		List<TableResult> results = new ArrayList<>(sqlList.size());
 
+		List<String> ssSql = null;
 		StatementSet statementSet = null;
 		for (String sql : sqlList) {
 			Matcher matcher;
@@ -51,16 +57,34 @@ public class TableUtil {
 				final String value = matcher.group(3);
 				tableEnv.getConfig().getConfiguration().setString(key, value);
 			} else if (STATEMENT_SET_START.matcher(sql).matches()) {
+				ssSql = new ArrayList<>();
 				statementSet = tableEnv.createStatementSet();
 			} else if (STATEMENT_SET_END.matcher(sql).matches()) {
 				if (statementSet != null) {
-					results.add(statementSet.execute());
+					try {
+						results.add(statementSet.execute());
+					} catch (Exception e) {
+						LOG.error("statementSet error: {}", Arrays.toString(ssSql.toArray(new String[0])));
+						throw e;
+					}
 				}
+				ssSql = null;
 				statementSet = null;
 			} else if (statementSet != null) {
-				statementSet.addInsertSql(sql);
+				try {
+					statementSet.addInsertSql(sql);
+				} catch (Exception e) {
+					LOG.error("addInsertSql error: {}", sql);
+					throw e;
+				}
+				ssSql.add(sql);
 			} else {
-				results.add(tableEnv.executeSql(sql));
+				try {
+					results.add(tableEnv.executeSql(sql));
+				} catch (Exception e) {
+					LOG.error("executeSql error: {}", sql);
+					throw e;
+				}
 			}
 		}
 
